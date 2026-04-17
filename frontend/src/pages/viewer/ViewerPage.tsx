@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { channelApi, dataApi } from '../../api/viewerClient';
 import type { Channel, StatsResponse } from '../../types/viewer';
 import DataTable from './DataTable';
@@ -17,6 +17,7 @@ const ViewerPage = () => {
   const [isStartPickerOpen, setIsStartPickerOpen] = useState(false);
   const [isEndPickerOpen, setIsEndPickerOpen] = useState(false);
   const [statsData, setStatsData] = useState<StatsResponse | null>(null);
+  const statsRequestIdRef = useRef(0);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -71,9 +72,14 @@ const ViewerPage = () => {
   };
 
   const loadStats = async (channelId: number, start: string, end: string | null) => {
-    try { setLoading(true); const r = await dataApi.getStats(channelId, start, end); setStatsData(r.data); }
-    catch { showMessage('error', '통계 데이터를 불러오는데 실패했습니다.'); }
-    finally { setLoading(false); }
+    const requestId = ++statsRequestIdRef.current;
+    try {
+      setLoading(true);
+      const r = await dataApi.getStats(channelId, start, end);
+      if (requestId === statsRequestIdRef.current) setStatsData(r.data);
+    }
+    catch { if (requestId === statsRequestIdRef.current) showMessage('error', '통계 데이터를 불러오는데 실패했습니다.'); }
+    finally { if (requestId === statsRequestIdRef.current) setLoading(false); }
   };
 
   const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); setIsDragging(true); };

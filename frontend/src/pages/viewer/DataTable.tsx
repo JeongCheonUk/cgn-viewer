@@ -36,7 +36,9 @@ const DataTable = ({ stats, totalRequests, channelName, dateInfo }: DataTablePro
       cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
     }
     sortedStats.forEach(stat => {
-      worksheet.addRow({ country: stat.country, requestCount: parseInt(stat.requestCount.toString()), requestPercent: stat.requestPercent + '%', bytesMB: parseFloat(stat.bytesMB).toFixed(2) });
+      const row = worksheet.addRow({ country: stat.country, requestCount: parseInt(stat.requestCount.toString()), requestPercent: stat.requestPercent + '%', bytesMB: parseFloat(stat.bytesMB) });
+      row.getCell(2).numFmt = '#,##0';
+      row.getCell(4).numFmt = '#,##0.00';
     });
     worksheet.eachRow((row, rowNumber) => {
       if (rowNumber > 1) {
@@ -47,18 +49,19 @@ const DataTable = ({ stats, totalRequests, channelName, dateInfo }: DataTablePro
         }
       }
     });
-    const addTotalRow = (label: string, value: string | number) => {
-      const row = worksheet.addRow({ country: label, requestCount: typeof value === 'number' ? value : '', requestPercent: '', bytesMB: typeof value === 'string' ? value : '' });
+    const totalRequestRow = worksheet.addRow({ country: '총 요청 수', requestCount: totalRequests, requestPercent: '', bytesMB: '' });
+    totalRequestRow.getCell(2).numFmt = '#,##0';
+    const totalBytesRow = worksheet.addRow({ country: '총 바이트', requestCount: '', requestPercent: '', bytesMB: totalBytes });
+    totalBytesRow.getCell(4).numFmt = '#,##0.00';
+    [totalRequestRow, totalBytesRow].forEach(row => {
       for (let col = 1; col <= 4; col++) {
         const cell = row.getCell(col);
         cell.font = { bold: true };
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFD966' } };
         cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
-        if (col === 4) cell.alignment = { horizontal: 'right' };
+        if (col >= 2) cell.alignment = { horizontal: 'right' };
       }
-    };
-    addTotalRow('총 요청 수', totalRequests);
-    addTotalRow('총 바이트', totalBytes.toFixed(2));
+    });
     worksheet.views = [{ state: 'frozen', xSplit: 0, ySplit: 1 }];
     const buffer = await workbook.xlsx.writeBuffer();
     const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });

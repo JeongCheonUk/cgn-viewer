@@ -1,10 +1,18 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, forwardRef } from 'react';
 import { channelApi, dataApi } from '../../api/viewerClient';
 import type { Channel, StatsResponse } from '../../types/viewer';
 import DataTable from './DataTable';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import './ViewerPage.css';
+
+const DateDisplay = forwardRef<HTMLSpanElement, { formattedDate: string; onClick?: () => void }>(
+  ({ formattedDate, onClick }, ref) => (
+    <span ref={ref} className="viewer-date-display clickable" onClick={onClick}>
+      {formattedDate}
+    </span>
+  )
+);
 
 const ViewerPage = () => {
   const [channels, setChannels] = useState<Channel[]>([]);
@@ -13,9 +21,6 @@ const ViewerPage = () => {
   const [selectedDate, setSelectedDate] = useState<string | null>(new Date().toISOString().split('T')[0]);
   const [startDate, setStartDate] = useState<string | null>(new Date().toISOString().split('T')[0]);
   const [endDate, setEndDate] = useState<string | null>(new Date().toISOString().split('T')[0]);
-  const [isSinglePickerOpen, setIsSinglePickerOpen] = useState(false);
-  const [, setIsStartPickerOpen] = useState(false);
-  const [, setIsEndPickerOpen] = useState(false);
   const [statsData, setStatsData] = useState<StatsResponse | null>(null);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
@@ -187,23 +192,26 @@ const ViewerPage = () => {
                 {queryMode === 'single' ? (
                   <div className="viewer-date-nav-item">
                     <button onClick={() => changeDate('single', 'prev')} className="viewer-date-btn">◀</button>
-                    <span className="viewer-date-display clickable" onClick={() => setIsSinglePickerOpen(true)}>
-                      {formatDate(selectedDate || today)}
-                    </span>
-                    <DatePicker selected={displayDate ? new Date(displayDate) : new Date()} onChange={(date: Date | null) => { if (date) { setSelectedDate(date.toISOString().split('T')[0]); setIsSinglePickerOpen(false); } }} open={isSinglePickerOpen} onClickOutside={() => setIsSinglePickerOpen(false)} dateFormat="yyyy-MM-dd" customInput={<div style={{ display: 'none' }} />} />
+                    <DatePicker
+                      selected={displayDate ? new Date(displayDate) : new Date()}
+                      onChange={(date: Date | null) => { if (date) setSelectedDate(date.toISOString().split('T')[0]); }}
+                      dateFormat="yyyy-MM-dd"
+                      customInput={<DateDisplay formattedDate={formatDate(selectedDate || today)} />}
+                      popperPlacement="bottom"
+                    />
                     <button onClick={() => changeDate('single', 'next')} className="viewer-date-btn">▶</button>
                   </div>
                 ) : (
                   <div className="viewer-date-nav-range">
                     <div className="viewer-date-nav-item">
                       <button onClick={() => changeDate('start', 'prev')} className="viewer-date-btn">◀</button>
-                      <span className="viewer-date-display clickable" onClick={() => setIsStartPickerOpen(true)}>{formatDate(startDate || today)}</span>
+                      <span className="viewer-date-display clickable">{formatDate(startDate || today)}</span>
                       <button onClick={() => changeDate('start', 'next')} className="viewer-date-btn">▶</button>
                     </div>
                     <span className="viewer-date-sep">~</span>
                     <div className="viewer-date-nav-item">
                       <button onClick={() => changeDate('end', 'prev')} className="viewer-date-btn">◀</button>
-                      <span className="viewer-date-display clickable" onClick={() => setIsEndPickerOpen(true)}>{formatDate(endDate || today)}</span>
+                      <span className="viewer-date-display clickable">{formatDate(endDate || today)}</span>
                       <button onClick={() => changeDate('end', 'next')} className="viewer-date-btn">▶</button>
                     </div>
                   </div>

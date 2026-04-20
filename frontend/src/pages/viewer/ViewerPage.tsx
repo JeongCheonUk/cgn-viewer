@@ -165,7 +165,7 @@ const ViewerPage = () => {
         <div className="viewer-header-content">
           <div className="viewer-header-left">
             <div className="viewer-header-title" onClick={handleReset} style={{ cursor: 'pointer' }}>
-              <h1>CGN Viewer</h1>
+              <h1>CGN DreamOn Data Viewer</h1>
             </div>
           </div>
           <div className="viewer-header-controls">

@@ -17,6 +17,21 @@ const DISTRIBUTION_CHANNEL_MAP: Record<string, string> = {
   'E3QZ563087DL4W': '일본',
 }
 
+function parseCSVLine(line: string, delimiter: string): string[] {
+  if (delimiter === '\t') return line.split('\t').map(v => v.replace(/"/g, '').trim())
+  const result: string[] = []
+  let current = ''
+  let inQuotes = false
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i]
+    if (ch === '"') { inQuotes = !inQuotes }
+    else if (ch === ',' && !inQuotes) { result.push(current.trim()); current = '' }
+    else { current += ch }
+  }
+  result.push(current.trim())
+  return result
+}
+
 function parseCloudFrontCSV(content: string) {
   const lines = content.split('\n')
 
@@ -50,12 +65,12 @@ function parseCloudFrontCSV(content: string) {
   if (dataLines.length === 0) throw new Error('데이터가 없습니다.')
 
   const delimiter = dataLines[0].includes('\t') ? '\t' : ','
-  const headers = dataLines[0].split(delimiter).map(h => h.replace(/"/g, '').trim())
+  const headers = parseCSVLine(dataLines[0], delimiter)
 
   const statsMap = new Map<string, { requestCount: number; bytesTotal: number }>()
 
   for (let i = 1; i < dataLines.length; i++) {
-    const values = dataLines[i].split(delimiter).map(v => v.replace(/"/g, '').trim())
+    const values = parseCSVLine(dataLines[i], delimiter)
     const record: Record<string, string> = {}
     headers.forEach((h, idx) => { record[h] = values[idx] || '' })
 

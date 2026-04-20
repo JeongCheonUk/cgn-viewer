@@ -18,7 +18,8 @@ const ViewerPage = () => {
   const [isEndPickerOpen, setIsEndPickerOpen] = useState(false);
   const [statsData, setStatsData] = useState<StatsResponse | null>(null);
   const statsRequestIdRef = useRef(0);
-  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadFiles, setUploadFiles] = useState<File[]>([]);
+  const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number } | null>(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [showUploadModal, setShowUploadModal] = useState(false);
@@ -86,9 +87,10 @@ const ViewerPage = () => {
   const handleDragLeave = (e: React.DragEvent) => { e.preventDefault(); setIsDragging(false); };
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault(); setIsDragging(false);
-    const files = e.dataTransfer.files;
-    if (files?.[0]?.name.endsWith('.csv')) setUploadFile(files[0]);
-    else showMessage('error', 'CSV 파일만 업로드 가능합니다.');
+    const files = Array.from(e.dataTransfer.files);
+    const csvFiles = files.filter(f => f.name.endsWith('.csv'));
+    if (csvFiles.length === 0) showMessage('error', 'CSV 파일만 업로드 가능합니다.');
+    else setUploadFiles(prev => [...prev, ...csvFiles]);
   };
 
   const formatDate = (dateStr: string) => {
@@ -107,32 +109,44 @@ const ViewerPage = () => {
   const handleReset = () => {
     const today = new Date().toISOString().split('T')[0];
     setSelectedChannel(null); setSelectedDate(today); setStartDate(today); setEndDate(today);
-    setStatsData(null); setUploadFile(null); setMessage(null);
+    setStatsData(null); setUploadFiles([]); setMessage(null);
     loadChannels();
   };
 
   const handleUpload = async () => {
-    if (!uploadFile) { showMessage('error', '파일을 선택해주세요.'); return; }
-    try {
-      setLoading(true);
-      await dataApi.uploadCSV(uploadFile);
-      showMessage('success', '파일이 성공적으로 업로드되었습니다.');
-      setUploadFile(null); setShowUploadModal(false);
-      const fileInput = document.getElementById('file-upload') as HTMLInputElement;
-      if (fileInput) fileInput.value = '';
-      if (selectedChannel && selectedDate) {
-        if (queryMode === 'single' && selectedDate) loadStats(selectedChannel, selectedDate, null);
-        else if (queryMode === 'range' && startDate && endDate) loadStats(selectedChannel, startDate, endDate);
+    if (uploadFiles.length === 0) { showMessage('error', '파일을 선택해주세요.'); return; }
+    const total = uploadFiles.length;
+    let successCount = 0;
+    const errors: string[] = [];
+    setLoading(true);
+    setUploadProgress({ current: 0, total });
+    for (let i = 0; i < total; i++) {
+      setUploadProgress({ current: i + 1, total });
+      try {
+        await dataApi.uploadCSV(uploadFiles[i]);
+        successCount++;
+      } catch (error: unknown) {
+        let msg = uploadFiles[i].name;
+        if (error && typeof error === 'object' && 'response' in error) {
+          const r = (error as { response?: { data?: { error?: string } } }).response;
+          msg += `: ${r?.data?.error || '업로드 실패'}`;
+        }
+        errors.push(msg);
       }
-      loadChannels();
-    } catch (error: unknown) {
-      let msg = '파일 업로드에 실패했습니다.';
-      if (error && typeof error === 'object' && 'response' in error) {
-        const r = (error as { response?: { data?: { error?: string } } }).response;
-        msg = r?.data?.error || msg;
-      }
-      showMessage('error', msg);
-    } finally { setLoading(false); }
+    }
+    setLoading(false);
+    setUploadProgress(null);
+    setUploadFiles([]);
+    setShowUploadModal(false);
+    const fileInput = document.getElementById('file-upload') as HTMLInputElement;
+    if (fileInput) fileInput.value = '';
+    if (errors.length > 0) showMessage('error', `${successCount}개 성공, ${errors.length}개 실패: ${errors[0]}`);
+    else showMessage('success', `${successCount}개 파일이 성공적으로 업로드되었습니다.`);
+    if (selectedChannel && selectedDate) {
+      if (queryMode === 'single' && selectedDate) loadStats(selectedChannel, selectedDate, null);
+      else if (queryMode === 'range' && startDate && endDate) loadStats(selectedChannel, startDate, endDate);
+    }
+    loadChannels();
   };
 
   const showMessage = (type: 'success' | 'error', text: string) => {
@@ -278,15 +292,33 @@ const ViewerPage = () => {
             </div>
             <div className="viewer-modal-body">
               <div className={`viewer-upload-area ${isDragging ? 'dragging' : ''}`} onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}>
-                <input id="file-upload" type="file" accept=".csv" onChange={(e) => { if (e.target.files?.[0]) setUploadFile(e.target.files[0]); }} className="viewer-file-input" />
-                {!uploadFile && <p className="viewer-drag-text">{isDragging ? '파일을 놓으세요' : '파일을 드래그하거나 선택하세요'}</p>}
-                {uploadFile && <p className="viewer-file-name">선택된 파일: {uploadFile.name}</p>}
+                <input id="file-upload" type="file" accept=".csv" multiple onChange={(e) => { if (e.target.files) setUploadFiles(prev => [...prev, ...Array.from(e.target.files!).filter(f => f.name.endsWith('.csv'))]); }} className="viewer-file-input" />
+                {uploadFiles.length === 0 && <p className="viewer-drag-text">{isDragging ? '파일을 놓으세요' : '파일을 드래그하거나 선택하세요 (다중 선택 가능)'}</p>}
+                {uploadFiles.length > 0 && (
+                  <div className="viewer-file-list">
+                    <p className="viewer-file-count">{uploadFiles.length}개 파일 선택됨</p>
+                    {uploadFiles.map((f, i) => (
+                      <div key={i} className="viewer-file-item">
+                        <span>{f.name}</span>
+                        <button onClick={() => setUploadFiles(prev => prev.filter((_, idx) => idx !== i))} className="viewer-file-remove">✕</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
+              {uploadProgress && (
+                <div className="viewer-progress">
+                  <div className="viewer-progress-label">{uploadProgress.current} / {uploadProgress.total} 처리 중 ({Math.round((uploadProgress.current / uploadProgress.total) * 100)}%)</div>
+                  <div className="viewer-progress-bar">
+                    <div className="viewer-progress-fill" style={{ width: `${(uploadProgress.current / uploadProgress.total) * 100}%` }} />
+                  </div>
+                </div>
+              )}
             </div>
             <div className="viewer-modal-footer">
-              <button onClick={() => setShowUploadModal(false)} className="viewer-btn-cancel">취소</button>
-              <button onClick={handleUpload} disabled={!uploadFile || loading} className="viewer-btn-upload">
-                {loading ? '업로드 중...' : '업로드'}
+              <button onClick={() => { setShowUploadModal(false); setUploadFiles([]); }} className="viewer-btn-cancel">취소</button>
+              <button onClick={handleUpload} disabled={uploadFiles.length === 0 || loading} className="viewer-btn-upload">
+                {loading ? '업로드 중...' : `업로드 (${uploadFiles.length}개)`}
               </button>
             </div>
           </div>

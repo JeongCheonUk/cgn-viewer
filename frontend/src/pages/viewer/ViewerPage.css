@@ -321,3 +321,15 @@
 /* react-datepicker */
 .react-datepicker-wrapper { display: none !important; }
 .react-datepicker-popper { z-index: 9999 !important; }
+
+.viewer-file-list { width: 100%; max-height: 200px; overflow-y: auto; }
+.viewer-file-count { font-size: 13px; font-weight: 600; color: #667eea; margin-bottom: 8px; }
+.viewer-file-item { display: flex; justify-content: space-between; align-items: center; padding: 6px 8px; background: #f8f9ff; border-radius: 4px; margin-bottom: 4px; font-size: 13px; }
+.viewer-file-item span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+.viewer-file-remove { background: none; border: none; color: #999; cursor: pointer; padding: 0 4px; font-size: 14px; flex-shrink: 0; }
+.viewer-file-remove:hover { color: #e53e3e; }
+
+.viewer-progress { margin-top: 16px; }
+.viewer-progress-label { font-size: 13px; color: #555; margin-bottom: 6px; text-align: center; }
+.viewer-progress-bar { height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden; }
+.viewer-progress-fill { height: 100%; background: linear-gradient(90deg, #667eea, #764ba2); border-radius: 4px; transition: width 0.3s ease; }
